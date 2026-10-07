@@ -1,0 +1,47 @@
+# PlagaScan -- que NO se guarda en git
+
+# --- Compilacion (se regenera sola) ---
+build/
+.gradle/
+.cxx/
+.kotlin/
+.externalNativeBuild/
+captures/
+.idea/
+*.iml
+local.properties
+
+# --- Firma de la app: NUNCA se sube ---
+*.jks
+*.keystore
+*.p12
+*.pem
+keystore.properties
+*.properties
+!gradle.properties
+!gradle/wrapper/gradle-wrapper.properties
+!gradle/gradle-daemon-jvm.properties
+
+# --- APK y paquetes generados ---
+*.apk
+*.aab
+*.ap_
+app/release/
+
+# --- OpenCV 4.9.0 (modulo sdk): partes que la compilacion no usa ---
+# staticlibs y 3rdparty (640 MB) solo sirven para enlazar OpenCV desde C++.
+# x86 y x86_64 son para emuladores; la app solo empaqueta armeabi-v7a y arm64-v8a.
+sdk/native/staticlibs/
+sdk/native/3rdparty/
+sdk/native/libs/x86/
+sdk/native/libs/x86_64/
+
+# --- Respaldos y volcados de trabajo ---
+*.bak
+*.bak[0-9]
+*.backup_*
+codigo_android.txt
+logica_android.txt
+
+# --- Sistema ---
+.DS_Store

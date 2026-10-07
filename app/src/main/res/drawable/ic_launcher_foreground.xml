@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PlagaScan icono E: hoja de frijol dentro del visor -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:translateX="54" android:translateY="54" android:scaleX="0.140625" android:scaleY="0.140625">
+        <group android:translateX="0" android:translateY="0" android:rotation="0" android:scaleX="1" android:scaleY="1">
+            <path android:pathData="M-150,-94 L-150,-120 Q-150,-150 -120,-150 L-94,-150 M150,-94 L150,-120 Q150,-150 120,-150 L94,-150 M150,94 L150,120 Q150,150 120,150 L94,150 M-150,94 L-150,120 Q-150,150 -120,150 L-94,150" android:strokeColor="#0B4A2B" android:strokeWidth="16" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        </group>
+        <group android:translateX="-4" android:translateY="19" android:rotation="-20" android:scaleX="0.92" android:scaleY="0.92">
+            <path android:pathData="M0,-150 C52,-104 118,-34 112,44 C107,108 54,140 0,116 C-54,140 -107,108 -112,44 C-118,-34 -52,-104 0,-150 Z" android:fillColor="#7A4300" android:fillAlpha="0.2" />
+        </group>
+        <group android:translateX="-4" android:translateY="6" android:rotation="-20" android:scaleX="0.92" android:scaleY="0.92">
+            <path android:pathData="M0,-150 C52,-104 118,-34 112,44 C107,108 54,140 0,116 C-54,140 -107,108 -112,44 C-118,-34 -52,-104 0,-150 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="linear" android:startX="-112" android:startY="-150" android:endX="112" android:endY="140" android:startColor="#2FBF5B" android:endColor="#0B5D34" />
+                </aapt:attr>
+            </path>
+            <path android:pathData="M0,-120 L0,166" android:strokeColor="#FFF6CC" android:strokeWidth="12" android:strokeLineCap="round" android:strokeLineJoin="round" />
+            <path android:pathData="M0,-44 C-28,-52 -56,-44 -78,-22 M0,20 C-30,12 -62,20 -86,44 M0,-44 C28,-52 56,-44 78,-22 M0,20 C30,12 62,20 86,44" android:strokeColor="#FFF6CC" android:strokeWidth="8" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeAlpha="0.65" />
+        </group>
+    </group>
+</vector>
