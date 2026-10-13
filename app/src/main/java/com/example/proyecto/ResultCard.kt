@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
@@ -124,7 +125,9 @@ private fun ResultadoAnalisis(uiState: ScanUiState, modifier: Modifier) {
         nivel = uiState.riskLevel,
         confianza = uiState.confidence ?: 0f,
         imagePath = uiState.imagePath,
-        modifier = modifier
+        modifier = modifier,
+        mapa = uiState.mapaColor,
+        mapaCalculando = uiState.mapaCalculando
     )
 }
 
@@ -140,7 +143,10 @@ internal fun TarjetaResultado(
     confianza: Float,
     imagePath: String?,
     modifier: Modifier = Modifier,
-    detalleAbierto: Boolean = false
+    detalleAbierto: Boolean = false,
+    // EXPERIMENTO: mapa de color; el Historial no lo pasa y no se muestra ahi
+    mapa: LeafColorMap.Resultado? = null,
+    mapaCalculando: Boolean = false
 ) {
     val color = colorSemaforo(nivel)
     val fondo = fondoSemaforo(nivel)
@@ -300,6 +306,97 @@ internal fun TarjetaResultado(
             color = PlagaScanGray,
             textAlign = TextAlign.Center
         )
+
+        // EXPERIMENTO: mapa de color, separado del resultado del pulgon
+        if (mapaCalculando || mapa != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+            SeccionMapaColor(mapa = mapa, calculando = mapaCalculando)
+        }
+    }
+}
+
+/**
+ * EXPERIMENTO: mapa de color de la hoja (LeafColorMap, modo papel blanco).
+ * Solo describe colores; no nombra una causa ni cambia el semaforo.
+ */
+@Composable
+private fun SeccionMapaColor(mapa: LeafColorMap.Resultado?, calculando: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(PlagaScanSurfaceVariant)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Palette, contentDescription = null, tint = PlagaScanGreenText, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Mapa de color de la hoja (experimental)",
+                style = MaterialTheme.typography.titleMedium,
+                color = PlagaScanInk
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        val imagen = mapa?.imagen
+        when {
+            calculando -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = PlagaScanGreen, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Calculando mapa…", style = MaterialTheme.typography.bodyMedium, color = PlagaScanInk)
+            }
+            mapa == null -> Text(
+                "No se pudo calcular el mapa para esta foto.",
+                style = MaterialTheme.typography.bodyMedium, color = PlagaScanInk
+            )
+            !mapa.sobrePapel || imagen == null -> Text(
+                "Para ver el mapa, pon la hoja sola sobre una hoja de papel blanco " +
+                    "y toma la foto con flash o con buena luz de frente.",
+                style = MaterialTheme.typography.bodyMedium, color = PlagaScanInk
+            )
+            else -> {
+                Image(
+                    bitmap = imagen.asImageBitmap(),
+                    contentDescription = "Mapa de color de la hoja",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(imagen.width.toFloat() / imagen.height)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                LeyendaMapa(Color(0xFFFF00FF), "Zonas descoloridas (pálidas o secas)", mapa.pctDescolorida)
+                LeyendaMapa(Color(0xFFFFD700), "Zonas amarillentas", mapa.pctAmarillenta)
+                LeyendaMapa(Color(0xFF008CFF), "Zonas cafés o rojizas", mapa.pctCafe)
+                if (mapa.evaluada < 0.95f) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Se revisó el ${"%.0f".format(mapa.evaluada * 100f)} % de la hoja; el resto quedó en sombra.",
+                        style = MaterialTheme.typography.bodySmall, color = PlagaScanGray
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Marca zonas de color distinto al verde de la hoja. No dice la causa " +
+                "y no detecta puntos muy pequeños.",
+            style = MaterialTheme.typography.bodySmall,
+            color = PlagaScanGray
+        )
+    }
+}
+
+@Composable
+private fun LeyendaMapa(color: Color, texto: String, pct: Float) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(texto, style = MaterialTheme.typography.bodyMedium, color = PlagaScanInk, modifier = Modifier.weight(1f))
+        Text("${"%.1f".format(pct)} %", style = MaterialTheme.typography.labelLarge, color = PlagaScanInk)
     }
 }
 

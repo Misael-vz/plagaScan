@@ -32,7 +32,11 @@ data class ScanUiState(
     val confidence: Float? = null,
     val riskLevel: String? = null, // "VERDE" | "AMARILLO" | "ROJO"
     val errorMessage: String? = null,
-    val imagePath: String? = null // foto analizada, para mostrarla en ResultCard
+    val imagePath: String? = null, // foto analizada, para mostrarla en ResultCard
+    // EXPERIMENTO: mapa de color (LeafColorMap). Se calcula despues de mostrar
+    // el resultado del pulgon y no se guarda en el historial.
+    val mapaCalculando: Boolean = false,
+    val mapaColor: LeafColorMap.Resultado? = null
 )
 
 // Resultado individual de una foto dentro de la secuencia de 3, ya
@@ -82,6 +86,7 @@ class MainViewModel(
     private val leafSegmenter = LeafSegmenter()
     private val classifier = PlagaScanClassifier(application.applicationContext)
     private val locationHelper = LocationHelper(application.applicationContext)
+    private val leafColorMap = LeafColorMap() // EXPERIMENTO
 
     init {
         viewModelScope.launch {
@@ -138,6 +143,7 @@ class MainViewModel(
                     imagePath = savedPath
                 )
                 Log.d("PlagaScan", "Tiempo de analisis (1 foto): ${System.currentTimeMillis() - inicio} ms")
+                calcularMapaColor(bitmap, savedPath) // EXPERIMENTO: despues del resultado
 
                 // RF08: ubicacion aproximada con limite de tiempo
                 val location = locationHelper.getLastLocation()
@@ -330,6 +336,7 @@ class MainViewModel(
                     imagePath = savedPath
                 )
                 Log.d("PlagaScan", "Tiempo de analisis (3 fotos): ${System.currentTimeMillis() - inicio} ms")
+                calcularMapaColor(bestInGroup.originalBitmap, savedPath) // EXPERIMENTO
 
                 // RF08: ubicacion aproximada con limite de tiempo; el registro se
                 // guarda despues, en segundo plano
@@ -359,6 +366,30 @@ class MainViewModel(
                 repository.save(analysisResult)
             } catch (e: Exception) {
                 _uiState.value = ScanUiState(isLoading = false, errorMessage = "Algo salió mal al analizar. Intenta de nuevo.")
+            }
+        }
+    }
+
+    /**
+     * EXPERIMENTO: mapa de color de la hoja (modo papel blanco). Corre en su
+     * propia corrutina DESPUES de que el resultado del pulgon ya se mostro:
+     * no cambia la clasificacion, el semaforo, el tiempo medido ni lo que se
+     * guarda en el historial. Si falla, solo no aparece el mapa.
+     */
+    private fun calcularMapaColor(bitmap: Bitmap, imagePath: String) {
+        if (!MAPA_COLOR_ACTIVO) return
+        _uiState.value = _uiState.value.copy(mapaCalculando = true)
+        viewModelScope.launch {
+            val mapa = try {
+                withContext(Dispatchers.Default) { leafColorMap.analizar(bitmap) }
+            } catch (e: Exception) {
+                Log.w("MapaColor", "No se pudo calcular el mapa", e)
+                null
+            }
+            // Solo se aplica si la pantalla sigue mostrando ese mismo analisis
+            val actual = _uiState.value
+            if (actual.imagePath == imagePath) {
+                _uiState.value = actual.copy(mapaCalculando = false, mapaColor = mapa)
             }
         }
     }
