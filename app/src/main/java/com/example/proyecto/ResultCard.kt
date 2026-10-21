@@ -1,7 +1,9 @@
 package com.example.proyecto
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.speech.tts.TextToSpeech
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,11 +34,14 @@ import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,12 +56,16 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.proyecto.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * ResultCard -- tarjeta de resultado (RF02, RF03, RF07; prueba 3 de U3_P1).
@@ -170,6 +180,25 @@ internal fun TarjetaResultado(
         }
     }
 
+    // Accesibilidad (retroalimentacion del 14 oct): "Modo sol" de alto
+    // contraste, que se recuerda entre usos, y lectura del resultado en voz
+    // alta con el motor de voz del telefono (funciona sin internet si la voz
+    // en espanol esta instalada).
+    val contexto = LocalContext.current
+    val prefs = remember { contexto.getSharedPreferences(PREFS_ACCESIBILIDAD, Context.MODE_PRIVATE) }
+    var modoSol by remember { mutableStateOf(prefs.getBoolean(CLAVE_MODO_SOL, false)) }
+    val voz = remember { VozResultado(contexto) }
+    DisposableEffect(voz) { onDispose { voz.cerrar() } }
+
+    val titulo = tituloResultado(clasificacion, nivel)
+    val mensaje = mensajeCorto(clasificacion, nivel)
+    val textoHablado = "$titulo. Confianza $confPct por ciento. $mensaje"
+
+    // En Modo sol, un resultado nuevo se lee solo una vez (no desde el Historial)
+    LaunchedEffect(imagePath, confianza, voz.lista) {
+        if (modoSol && !detalleAbierto && voz.lista) voz.decir(textoHablado)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -177,6 +206,77 @@ internal fun TarjetaResultado(
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Botones de accesibilidad: grandes (minimo 56 dp de alto) y con texto
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BotonAccesibilidad(
+                icono = Icons.Outlined.WbSunny,
+                texto = if (modoSol) "Modo sol: sí" else "Modo sol",
+                activo = modoSol,
+                modifier = Modifier.weight(1f)
+            ) {
+                modoSol = !modoSol
+                prefs.edit().putBoolean(CLAVE_MODO_SOL, modoSol).apply()
+            }
+            BotonAccesibilidad(
+                icono = Icons.Outlined.VolumeUp,
+                texto = if (voz.lista) "Escuchar" else "Sin voz",
+                activo = false,
+                modifier = Modifier.weight(1f)
+            ) {
+                voz.decir(textoHablado)
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (modoSol) {
+            // Modo sol: el resultado va primero, en bloque de color solido con
+            // letra blanca grande (alto contraste, legible a pleno sol)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(color)
+                    .padding(horizontal = 16.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = iconoSemaforo(nivel),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(72.dp)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = titulo,
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Confianza $confPct %",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = mensaje,
+                color = Color.Black,
+                fontSize = 21.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // ---------- Nivel 1: siempre visible ----------
         Box(
             modifier = Modifier
@@ -195,54 +295,56 @@ internal fun TarjetaResultado(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-        // Icono del semaforo con un aro suave alrededor
-        Box(
-            modifier = Modifier.size(80.dp).clip(CircleShape).background(fondo.copy(alpha = 0.45f)),
-            contentAlignment = Alignment.Center
-        ) {
+        if (!modoSol) {
+            Spacer(modifier = Modifier.height(20.dp))
+            // Icono del semaforo con un aro suave alrededor
             Box(
-                modifier = Modifier.size(60.dp).clip(CircleShape).background(fondo),
+                modifier = Modifier.size(80.dp).clip(CircleShape).background(fondo.copy(alpha = 0.45f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = iconoSemaforo(nivel),
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier.size(60.dp).clip(CircleShape).background(fondo),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = iconoSemaforo(nivel),
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = titulo,
+                style = MaterialTheme.typography.headlineSmall,
+                color = color,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(fondo)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Confianza $confPct %",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = color
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = tituloResultado(clasificacion, nivel),
-            style = MaterialTheme.typography.headlineSmall,
-            color = color,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(fondo)
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-        ) {
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Confianza $confPct %",
-                style = MaterialTheme.typography.labelLarge,
-                color = color
+                text = mensaje,
+                style = MaterialTheme.typography.bodyLarge,
+                color = PlagaScanInk,
+                textAlign = TextAlign.Center
             )
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = mensajeCorto(clasificacion, nivel),
-            style = MaterialTheme.typography.bodyLarge,
-            color = PlagaScanInk,
-            textAlign = TextAlign.Center
-        )
 
         // Boton que invita a ver el detalle (pulsa 3 veces y se queda quieto)
         Spacer(modifier = Modifier.height(20.dp))
@@ -300,6 +402,65 @@ internal fun TarjetaResultado(
             color = PlagaScanGray,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+private const val PREFS_ACCESIBILIDAD = "plagascan_accesibilidad"
+private const val CLAVE_MODO_SOL = "modo_sol"
+
+/** Boton grande de accesibilidad (Modo sol / Escuchar). */
+@Composable
+private fun BotonAccesibilidad(
+    icono: ImageVector,
+    texto: String,
+    activo: Boolean,
+    modifier: Modifier = Modifier,
+    alTocar: () -> Unit
+) {
+    val fondoBoton = if (activo) Color.Black else PlagaScanSurfaceVariant
+    val tinta = if (activo) Color.White else PlagaScanInk
+    Row(
+        modifier = modifier
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(fondoBoton)
+            .clickable { alTocar() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(icono, contentDescription = null, tint = tinta, modifier = Modifier.size(26.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = texto, color = tinta, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * Lectura en voz alta con el motor TextToSpeech del telefono. Funciona sin
+ * internet cuando la voz en espanol esta descargada en el telefono; si no hay
+ * voz, el boton muestra "Sin voz" y no hace nada.
+ */
+private class VozResultado(contexto: Context) : TextToSpeech.OnInitListener {
+    var lista by mutableStateOf(false)
+        private set
+    private val motor = TextToSpeech(contexto.applicationContext, this)
+
+    override fun onInit(estado: Int) {
+        if (estado != TextToSpeech.SUCCESS) return
+        lista = idiomaDisponible(motor.setLanguage(Locale.forLanguageTag("es-MX"))) ||
+            idiomaDisponible(motor.setLanguage(Locale.forLanguageTag("es")))
+    }
+
+    private fun idiomaDisponible(r: Int) =
+        r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+
+    fun decir(texto: String) {
+        if (lista) motor.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "plagascan_resultado")
+    }
+
+    fun cerrar() {
+        motor.stop()
+        motor.shutdown()
     }
 }
 
